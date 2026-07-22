@@ -58,7 +58,7 @@ init_ee()
 
 # Gestion adaptable du chemin SHP
 WORK_DIR = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else r"D:\PROJET_SUIVI_DEFORESTATION_RDC"
-SHP_PATH = os.path.join(WORK_DIR, "SHPRDC", "gadm41_COD_1.shp")
+SHP_PATH = os.path.join(WORK_DIR, "gadm41_COD_1.shp")
 
 @st.cache_data
 def load_provinces(path):
