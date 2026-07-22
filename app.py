@@ -32,7 +32,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🌲 Plateforme Nationale de Surveillance, Prospective & Alerte Précoce (RDC)")
+st.title("🌲 Plateforme Nationale de Surveillance, Prospective & Alerte Précoce (RDC) Auteur: Stephin MBOKOLO")
 st.markdown("Outil décisionnel basé sur **Google Earth Engine** et la modélisation spatio-temporelle.")
 
 # --- INITIALISATION SÉCURISÉE CLOUD & LOCAL DE GEE ---
