@@ -27,8 +27,6 @@ def init_gee():
     try:
         if "GEE_JSON" in st.secrets:
             secrets_data = st.secrets["GEE_JSON"]
-            
-            # Gestion flexible : chaîne de caractères ou dictionnaire Streamlit (AttrDict)
             if isinstance(secrets_data, str):
                 json_creds = json.loads(secrets_data)
             else:
@@ -47,6 +45,17 @@ def init_gee():
         return False, str(e)
 
 gee_ok, gee_msg = init_gee()
+
+# Fonction utilitaire pour ajouter une image GEE sur Folium
+def add_ee_layer(ee_image_object, vis_params, name):
+    map_id_dict = ee.Image(ee_image_object).getMapId(vis_params)
+    return folium.TileLayer(
+        tiles=map_id_dict['tile_fetcher'].url_format,
+        attr='Google Earth Engine',
+        name=name,
+        overlay=True,
+        control=True
+    )
 
 # -----------------------------------------------------------------------------
 # 3. CHARGEMENT DU SHAPEFILE LOCAL (RDC / PROVINCES)
@@ -86,7 +95,7 @@ st.sidebar.subheader("📍 Choix de la Zone d'Étude")
 if gdf_provinces is not None and "NAME_1" in gdf_provinces.columns:
     provinces_list = sorted(gdf_provinces["NAME_1"].dropna().unique().tolist())
     select_options = ["🇨🇩 Toute la RDC (Vue Nationale)"] + provinces_list
-    selected_option = st.sidebar.selectbox("Zone administrative :", select_options, index=select_options.index("Mai-Ndombe") if "Mai-Ndombe" in select_options else 0)
+    selected_option = st.sidebar.selectbox("Zone administrative :", select_options, index=select_options.index("Sud-Ubangi") if "Sud-Ubangi" in select_options else 0)
     
     if selected_option == "🇨🇩 Toute la RDC (Vue Nationale)":
         is_national = True
@@ -96,20 +105,18 @@ if gdf_provinces is not None and "NAME_1" in gdf_provinces.columns:
         current_prov = selected_option
 else:
     is_national = False
-    current_prov = "Mai-Ndombe"
+    current_prov = "Sud-Ubangi"
     st.sidebar.warning("Shapefile non détecté. Utilisation de la zone par défaut.")
 
-# -----------------------------------------------------------------------------
 # SECTION VÉRIFICATION DE TERRAIN (GPS)
-# -----------------------------------------------------------------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("📌 Vérification de Terrain (GPS)")
 use_gps = st.sidebar.checkbox("Activer un point de contrôle GPS", value=False)
 
 gps_lat, gps_lon = None, None
 if use_gps:
-    gps_lat = st.sidebar.number_input("Latitude (°N/S) :", value=-2.000000, format="%.6f")
-    gps_lon = st.sidebar.number_input("Longitude (°E) :", value=18.300000, format="%.6f")
+    gps_lat = st.sidebar.number_input("Latitude (°N/S) :", value=3.250000, format="%.6f")
+    gps_lon = st.sidebar.number_input("Longitude (°E) :", value=19.750000, format="%.6f")
     gps_label = st.sidebar.text_input("Identifiant / Remarque :", value="Point de contrôle terrain")
 
 btn_refresh = st.sidebar.button("🚀 Lancer / Actualiser L'Analyse", type="primary")
@@ -125,11 +132,13 @@ def compute_gee_stats(geo_json_str, scale=1000):
         
         treecover2000 = hansen.select('treecover2000')
         loss = hansen.select('loss')
-        lossyear = hansen.select('lossyear')
         
         primary_forest = treecover2000.gte(60).And(loss.eq(0))
         secondary_forest = treecover2000.gte(10).And(treecover2000.lt(60)).And(loss.eq(0))
         deforestation = loss.gt(0)
+        
+        # Zone autre (Savanes, Sols nus, Urbain, Eau, Cultures)
+        other_land = treecover2000.lt(10).And(loss.eq(0))
         
         pixel_area = ee.Image.pixelArea().divide(10000) # ha
         
@@ -150,20 +159,22 @@ def compute_gee_stats(geo_json_str, scale=1000):
         area_primary = get_area(primary_forest)
         area_secondary = get_area(secondary_forest)
         area_deforest = get_area(deforestation)
+        area_other = get_area(other_land)
         
-        total_area = area_primary + area_secondary + area_deforest
+        total_area = area_primary + area_secondary + area_deforest + area_other
         
         return {
             "success": True,
             "primary": area_primary,
             "secondary": area_secondary,
             "deforestation": area_deforest,
+            "other": area_other,
             "total": total_area
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-# Détermination de la géométrie sélectionnée
+# Géométrie
 if gdf_provinces is not None:
     if is_national:
         selected_gdf = gdf_provinces
@@ -179,10 +190,10 @@ if gdf_provinces is not None:
     
     geo_json_payload = selected_gdf.geometry.unary_union.__geo_interface__
 else:
-    map_center = [-2.0, 18.3]
+    map_center = [3.25, 19.75]
     zoom_lvl = 7
     scale_res = 150
-    geo_json_payload = {"type": "Point", "coordinates": [18.3, -2.0]}
+    geo_json_payload = {"type": "Point", "coordinates": [19.75, 3.25]}
 
 # -----------------------------------------------------------------------------
 # 6. EN-TÊTE PRINCIPAL
@@ -194,7 +205,6 @@ if not gee_ok:
     st.error(f"❌ Erreur d'initialisation Google Earth Engine : {gee_msg}")
     st.stop()
 
-# Calcul des statistiques
 with st.spinner(f"Calcul des indicateurs spatiaux pour {current_prov}..."):
     stats = compute_gee_stats(json.dumps(geo_json_payload), scale=scale_res)
 
@@ -212,31 +222,50 @@ if menu_option == "📊 Observatoire Spatiale":
     p_pri = (stats["primary"] / tot) * 100
     p_sec = (stats["secondary"] / tot) * 100
     p_def = (stats["deforestation"] / tot) * 100
+    p_oth = (stats["other"] / tot) * 100
     
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Territoire Analysé", f"{stats['total']:,.0f} ha")
     c2.metric("🟢 Forêt Primaire", f"{stats['primary']:,.0f} ha", f"{p_pri:.1f}%")
     c3.metric("🟡 Forêt Secondaire", f"{stats['secondary']:,.0f} ha", f"{p_sec:.1f}%")
-    c4.metric("🔴 Déforestation Cumulée", f"{stats['deforestation']:,.0f} ha", f"{p_def:.1f}%")
+    c4.metric("🔴 Déforestation", f"{stats['deforestation']:,.0f} ha", f"{p_def:.1f}%")
+    c5.metric("⚪ Urbain / Savane / Autre", f"{stats['other']:,.0f} ha", f"{p_oth:.1f}%")
     
     st.markdown("---")
     
-    # Carte Folium
+    # Construction de la carte Folium interactive avec calques GEE
     m = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles="OpenStreetMap")
     
+    # Préparation des images GEE pour affichage dynamique
+    region_ee = ee.Geometry(geo_json_payload)
+    hansen_img = ee.Image("UMD/hansen/global_forest_change_2023_v1_11").clip(region_ee)
+    
+    treecover = hansen_img.select('treecover2000')
+    loss_img = hansen_img.select('loss')
+    
+    primary_mask = treecover.gte(60).And(loss_img.eq(0)).selfMask()
+    deforest_mask = loss_img.gt(0).selfMask()
+    
+    # Ajout des couches cartographiques colorées
+    layer_primary = add_ee_layer(primary_mask, {'palette': ['2e7d32']}, '🟢 Forêt Dense Primaire')
+    layer_deforest = add_ee_layer(deforest_mask, {'palette': ['d32f2f']}, '🔴 Déforestation (2000-2023)')
+    
+    layer_primary.add_to(m)
+    layer_deforest.add_to(m)
+    
+    # Limites Administratives
     if gdf_provinces is not None:
         folium.GeoJson(
             selected_gdf,
             name="Limites Administratives",
             style_function=lambda x: {
-                'fillColor': '#2e7d32',
+                'fillColor': 'transparent',
                 'color': '#1b5e20',
-                'weight': 2,
-                'fillOpacity': 0.1
+                'weight': 2.5
             }
         ).add_to(m)
     
-    # Ajout du point de contrôle GPS si activé
+    # Point GPS Terrain
     if use_gps and gps_lat is not None and gps_lon is not None:
         folium.Marker(
             location=[gps_lat, gps_lon],
@@ -244,26 +273,24 @@ if menu_option == "📊 Observatoire Spatiale":
             tooltip=f"📍 {gps_label}",
             icon=folium.Icon(color="red", icon="info-sign")
         ).add_to(m)
-        
-        # Le centrage bascule directement sur le point GPS saisi
         m.location = [gps_lat, gps_lon]
         m.zoom_start = 12
 
-    folium.LayerControl().add_to(m)
+    folium.LayerControl(collapsed=False).add_to(m)
     
     col_map, col_chart = st.columns([2, 1])
     
     with col_map:
-        st.markdown("**Carte Interactive & Contrôle Terrain**")
-        st_folium(m, width="100%", height=500)
+        st.markdown("**Carte Interactive & Superposition Satellite**")
+        st_folium(m, width="100%", height=520)
         if use_gps:
             st.info(f"📍 **Point de contrôle actif :** Latitude = `{gps_lat}`, Longitude = `{gps_lon}` ({gps_label})")
         
     with col_chart:
         st.markdown("**Répartition de l'Occupation**")
         df_pie = pd.DataFrame({
-            "Classe": ["Forêt Primaire", "Forêt Secondaire", "Déforestation"],
-            "Superficie": [stats["primary"], stats["secondary"], stats["deforestation"]]
+            "Classe": ["Forêt Primaire", "Forêt Secondaire", "Déforestation", "Urbain / Savane / Autre"],
+            "Superficie": [stats["primary"], stats["secondary"], stats["deforestation"], stats["other"]]
         })
         fig_pie = px.pie(
             df_pie, 
@@ -273,7 +300,8 @@ if menu_option == "📊 Observatoire Spatiale":
             color_discrete_map={
                 "Forêt Primaire": "#2e7d32",
                 "Forêt Secondaire": "#fbc02d",
-                "Déforestation": "#d32f2f"
+                "Déforestation": "#d32f2f",
+                "Urbain / Savane / Autre": "#9e9e9e"
             },
             hole=0.4
         )
@@ -351,6 +379,7 @@ elif menu_option == "📥 Rapports & Exportations":
         "Forest_Primary_ha": stats["primary"],
         "Forest_Secondary_ha": stats["secondary"],
         "Deforestation_ha": stats["deforestation"],
+        "Urban_Savanna_Other_ha": stats["other"],
         "Total_ha": stats["total"]
     }])
     
@@ -361,6 +390,7 @@ Zone : {current_prov}
 Forêt Primaire : {stats['primary']:,.2f} ha
 Forêt Secondaire : {stats['secondary']:,.2f} ha
 Déforestation Cumulée : {stats['deforestation']:,.2f} ha
+Urbain / Savane / Autre : {stats['other']:,.2f} ha
 Superficie Totale : {stats['total']:,.2f} ha
 ======================================================
 Generated via Streamlit National Forest Platform
