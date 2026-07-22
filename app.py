@@ -95,7 +95,7 @@ st.sidebar.subheader("📍 Choix de la Zone d'Étude")
 if gdf_provinces is not None and "NAME_1" in gdf_provinces.columns:
     provinces_list = sorted(gdf_provinces["NAME_1"].dropna().unique().tolist())
     select_options = ["🇨🇩 Toute la RDC (Vue Nationale)"] + provinces_list
-    selected_option = st.sidebar.selectbox("Zone administrative :", select_options, index=select_options.index("Sud-Ubangi") if "Sud-Ubangi" in select_options else 0)
+    selected_option = st.sidebar.selectbox("Zone administrative :", select_options, index=select_options.index("Tshopo") if "Tshopo" in select_options else 0)
     
     if selected_option == "🇨🇩 Toute la RDC (Vue Nationale)":
         is_national = True
@@ -105,7 +105,7 @@ if gdf_provinces is not None and "NAME_1" in gdf_provinces.columns:
         current_prov = selected_option
 else:
     is_national = False
-    current_prov = "Sud-Ubangi"
+    current_prov = "Tshopo"
     st.sidebar.warning("Shapefile non détecté. Utilisation de la zone par défaut.")
 
 # SECTION VÉRIFICATION DE TERRAIN (GPS)
@@ -115,8 +115,8 @@ use_gps = st.sidebar.checkbox("Activer un point de contrôle GPS", value=False)
 
 gps_lat, gps_lon = None, None
 if use_gps:
-    gps_lat = st.sidebar.number_input("Latitude (°N/S) :", value=3.250000, format="%.6f")
-    gps_lon = st.sidebar.number_input("Longitude (°E) :", value=19.750000, format="%.6f")
+    gps_lat = st.sidebar.number_input("Latitude (°N/S) :", value=0.500000, format="%.6f")
+    gps_lon = st.sidebar.number_input("Longitude (°E) :", value=25.200000, format="%.6f")
     gps_label = st.sidebar.text_input("Identifiant / Remarque :", value="Point de contrôle terrain")
 
 btn_refresh = st.sidebar.button("🚀 Lancer / Actualiser L'Analyse", type="primary")
@@ -190,10 +190,10 @@ if gdf_provinces is not None:
     
     geo_json_payload = selected_gdf.geometry.unary_union.__geo_interface__
 else:
-    map_center = [3.25, 19.75]
+    map_center = [0.5, 25.2]
     zoom_lvl = 7
     scale_res = 150
-    geo_json_payload = {"type": "Point", "coordinates": [19.75, 3.25]}
+    geo_json_payload = {"type": "Point", "coordinates": [25.2, 0.5]}
 
 # -----------------------------------------------------------------------------
 # 6. EN-TÊTE PRINCIPAL
@@ -233,10 +233,11 @@ if menu_option == "📊 Observatoire Spatiale":
     
     st.markdown("---")
     
-    # Construction de la carte Folium interactive avec calques GEE
+    # 1. CARTE INTERACTIVE EN PLEINE LARGEUR
+    st.markdown("### 🗺️ Carte Interactive & Superposition Satellite")
+    
     m = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles="OpenStreetMap")
     
-    # Préparation des images GEE pour affichage dynamique
     region_ee = ee.Geometry(geo_json_payload)
     hansen_img = ee.Image("UMD/hansen/global_forest_change_2023_v1_11").clip(region_ee)
     
@@ -246,14 +247,12 @@ if menu_option == "📊 Observatoire Spatiale":
     primary_mask = treecover.gte(60).And(loss_img.eq(0)).selfMask()
     deforest_mask = loss_img.gt(0).selfMask()
     
-    # Ajout des couches cartographiques colorées
     layer_primary = add_ee_layer(primary_mask, {'palette': ['2e7d32']}, '🟢 Forêt Dense Primaire')
     layer_deforest = add_ee_layer(deforest_mask, {'palette': ['d32f2f']}, '🔴 Déforestation (2000-2023)')
     
     layer_primary.add_to(m)
     layer_deforest.add_to(m)
     
-    # Limites Administratives
     if gdf_provinces is not None:
         folium.GeoJson(
             selected_gdf,
@@ -265,7 +264,6 @@ if menu_option == "📊 Observatoire Spatiale":
             }
         ).add_to(m)
     
-    # Point GPS Terrain
     if use_gps and gps_lat is not None and gps_lon is not None:
         folium.Marker(
             location=[gps_lat, gps_lon],
@@ -278,16 +276,19 @@ if menu_option == "📊 Observatoire Spatiale":
 
     folium.LayerControl(collapsed=False).add_to(m)
     
-    col_map, col_chart = st.columns([2, 1])
-    
-    with col_map:
-        st.markdown("**Carte Interactive & Superposition Satellite**")
-        st_folium(m, width="100%", height=520)
-        if use_gps:
-            st.info(f"📍 **Point de contrôle actif :** Latitude = `{gps_lat}`, Longitude = `{gps_lon}` ({gps_label})")
+    # Affichage de la carte folium sur toute la largeur
+    st_folium(m, width="100%", height=550)
+    if use_gps:
+        st.info(f"📍 **Point de contrôle actif :** Latitude = `{gps_lat}`, Longitude = `{gps_lon}` ({gps_label})")
         
-    with col_chart:
-        st.markdown("**Répartition de l'Occupation**")
+    st.markdown("---")
+    
+    # 2. GRAPHIQUE EN BAS DE LA CARTE (DISPOSITION LARGE)
+    st.markdown("### 🍩 Répartition Proportionnelle de l'Occupation du Sol")
+    
+    col_chart_left, col_chart_center, col_chart_right = st.columns([1, 2, 1])
+    
+    with col_chart_center:
         df_pie = pd.DataFrame({
             "Classe": ["Forêt Primaire", "Forêt Secondaire", "Déforestation", "Urbain / Savane / Autre"],
             "Superficie": [stats["primary"], stats["secondary"], stats["deforestation"], stats["other"]]
@@ -303,7 +304,18 @@ if menu_option == "📊 Observatoire Spatiale":
                 "Déforestation": "#d32f2f",
                 "Urbain / Savane / Autre": "#9e9e9e"
             },
-            hole=0.4
+            hole=0.45
+        )
+        fig_pie.update_traces(
+            textposition='outside', 
+            textinfo='percent+label',
+            pull=[0.02, 0.02, 0.05, 0.02]
+        )
+        fig_pie.update_layout(
+            showlegend=True,
+            legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
+            margin=dict(t=20, b=50, l=20, r=20),
+            height=450
         )
         st.plotly_chart(fig_pie, use_container_width=True)
 
