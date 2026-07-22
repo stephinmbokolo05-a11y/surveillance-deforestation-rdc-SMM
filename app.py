@@ -26,10 +26,17 @@ st.set_page_config(
 def init_gee():
     try:
         if "GEE_JSON" in st.secrets:
-            json_creds = json.loads(st.secrets["GEE_JSON"])
+            secrets_data = st.secrets["GEE_JSON"]
+            
+            # Gestion flexible : chaîne de caractères ou dictionnaire Streamlit (AttrDict)
+            if isinstance(secrets_data, str):
+                json_creds = json.loads(secrets_data)
+            else:
+                json_creds = dict(secrets_data)
+                
             credentials = ee.ServiceAccountCredentials(
                 json_creds["client_email"],
-                key_data=st.secrets["GEE_JSON"]
+                key_data=json.dumps(json_creds)
             )
             ee.Initialize(credentials)
             return True, "Initialisation réussie via st.secrets."
@@ -93,7 +100,7 @@ else:
     st.sidebar.warning("Shapefile non détecté. Utilisation de la zone par défaut.")
 
 # -----------------------------------------------------------------------------
-# NOUVEAU : SECTION VÉRIFICATION DE TERRAIN (GPS)
+# SECTION VÉRIFICATION DE TERRAIN (GPS)
 # -----------------------------------------------------------------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("📌 Vérification de Terrain (GPS)")
@@ -101,7 +108,6 @@ use_gps = st.sidebar.checkbox("Activer un point de contrôle GPS", value=False)
 
 gps_lat, gps_lon = None, None
 if use_gps:
-    # Coordonnées par défaut centrées sur le Mai-Ndombe/Cuvette centrale
     gps_lat = st.sidebar.number_input("Latitude (°N/S) :", value=-2.000000, format="%.6f")
     gps_lon = st.sidebar.number_input("Longitude (°E) :", value=18.300000, format="%.6f")
     gps_label = st.sidebar.text_input("Identifiant / Remarque :", value="Point de contrôle terrain")
@@ -342,7 +348,7 @@ elif menu_option == "📥 Rapports & Exportations":
     
     df_report = pd.DataFrame([{
         "Province": current_prov,
-        "Foreating_Primary_ha": stats["primary"],
+        "Forest_Primary_ha": stats["primary"],
         "Forest_Secondary_ha": stats["secondary"],
         "Deforestation_ha": stats["deforestation"],
         "Total_ha": stats["total"]
