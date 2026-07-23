@@ -13,7 +13,7 @@ import os
 # 1. CONFIGURATION DE LA PAGE
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Plateforme Nationale de Surveillance & Alerte Précoce (RDC)",
+    page_title="Plateforme Nationale de Surveillance Forestiere & Alerte Précoce (RDC)",
     page_icon="🌲",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -233,8 +233,8 @@ else:
 # -----------------------------------------------------------------------------
 # 6. EN-TÊTE PRINCIPAL
 # -----------------------------------------------------------------------------
-st.title("🌲 Plateforme Nationale de Surveillance, Prospective & Alerte Précoce (RDC)")
-st.caption("Outil décisionnel basé sur **Google Earth Engine**, **Random Forest** et le **Deep Learning**.")
+st.title("🌲 Plateforme Nationale de Surveillance Forestiere, Prospective & Alerte Précoce (RDC)")
+st.caption("Outil décisionnel basé sur **Google Earth Engine**, **Random Forest** et le **Deep Learning**., **Auteur: Stephin MBOKOLO**")
 
 if not gee_ok:
     st.error(f"❌ Erreur d'initialisation Google Earth Engine : {gee_msg}")
