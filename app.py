@@ -106,15 +106,44 @@ else:
     is_national = False
     current_prov = "Tshopo"
 
-# SECTION VÉRIFICATION DE TERRAIN (GPS)
+# -----------------------------------------------------------------------------
+# SECTION VÉRIFICATION DE TERRAIN (GPS) - SUPPORT MULTI-FORMAT (DD / DMS)
+# -----------------------------------------------------------------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("📌 Vérification de Terrain (GPS)")
 use_gps = st.sidebar.checkbox("Activer un point de contrôle GPS", value=False)
 
 gps_lat, gps_lon = None, None
 if use_gps:
-    gps_lat = st.sidebar.number_input("Latitude (°N/S) :", value=0.500000, format="%.6f")
-    gps_lon = st.sidebar.number_input("Longitude (°E) :", value=25.200000, format="%.6f")
+    format_coord = st.sidebar.radio(
+        "Format des coordonnées GPS :",
+        ["Degrés Décimaux (DD)", "Degrés Minutes Secondes (DMS)"]
+    )
+    
+    if format_coord == "Degrés Décimaux (DD)":
+        gps_lat = st.sidebar.number_input("Latitude (°N/S) :", value=0.500000, format="%.6f")
+        gps_lon = st.sidebar.number_input("Longitude (°E) :", value=25.200000, format="%.6f")
+    else:
+        st.sidebar.caption("Saisie Latitude :")
+        c1, c2, c3, c4 = st.sidebar.columns(4)
+        lat_d = c1.number_input("Deg (°)", value=0, min_value=0, max_value=90, key="lat_d")
+        lat_m = c2.number_input("Min (')", value=30, min_value=0, max_value=59, key="lat_m")
+        lat_s = c3.number_input("Sec (\")", value=0.0, min_value=0.0, max_value=59.99, key="lat_s")
+        lat_dir = c4.selectbox("Hemi", ["N", "S"], key="lat_dir")
+        
+        st.sidebar.caption("Saisie Longitude :")
+        c5, c6, c7, c8 = st.sidebar.columns(4)
+        lon_d = c5.number_input("Deg (°)", value=25, min_value=0, max_value=180, key="lon_d")
+        lon_m = c6.number_input("Min (')", value=12, min_value=0, max_value=59, key="lon_m")
+        lon_s = c7.number_input("Sec (\")", value=0.0, min_value=0.0, max_value=59.99, key="lon_s")
+        lon_dir = c8.selectbox("Hemi", ["E", "W"], key="lon_dir")
+        
+        # Formule de conversion DMS -> DD
+        gps_lat = (lat_d + (lat_m / 60.0) + (lat_s / 3600.0)) * (-1 if lat_dir == "S" else 1)
+        gps_lon = (lon_d + (lon_m / 60.0) + (lon_s / 3600.0)) * (-1 if lon_dir == "W" else 1)
+        
+        st.sidebar.info(f"Équivalence DD : `{gps_lat:.6f}, {gps_lon:.6f}`")
+
     gps_label = st.sidebar.text_input("Identifiant / Remarque :", value="Point de contrôle terrain")
 
 btn_refresh = st.sidebar.button("🚀 Lancer / Actualiser L'Analyse", type="primary")
@@ -200,7 +229,7 @@ else:
 # 6. EN-TÊTE PRINCIPAL
 # -----------------------------------------------------------------------------
 st.title("🌲 Plateforme Nationale de Surveillance, Prospective & Alerte Précoce (RDC)")
-st.caption("Outil décisionnel basé sur **Google Earth Engine**, **Random Forest** et le **Deep Learning**. Auteur: Stephin MBOKOLO")
+st.caption("Outil décisionnel basé sur **Google Earth Engine**, **Random Forest** et le **Deep Learning**.")
 
 if not gee_ok:
     st.error(f"❌ Erreur d'initialisation Google Earth Engine : {gee_msg}")
