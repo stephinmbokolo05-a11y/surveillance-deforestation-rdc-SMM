@@ -76,8 +76,11 @@ gdf_provinces = load_shapefile(SHP_PATH)
 # -----------------------------------------------------------------------------
 # 4. BARRE LATÉRALE - NAVIGATION ET PARAMÈTRES
 # -----------------------------------------------------------------------------
-# Affichage du logo du Ministère en haut du menu latéral
+# Affichage robuste du logo (prend en compte logo.png ou logo.png.jpeg)
 LOGO_PATH = os.path.join(WORK_DIR, "logo.png")
+if not os.path.exists(LOGO_PATH):
+    LOGO_PATH = os.path.join(WORK_DIR, "logo.png.jpeg")
+
 if os.path.exists(LOGO_PATH):
     st.sidebar.image(LOGO_PATH, use_container_width=True)
 
