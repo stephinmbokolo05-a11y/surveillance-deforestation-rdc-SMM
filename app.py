@@ -76,6 +76,11 @@ gdf_provinces = load_shapefile(SHP_PATH)
 # -----------------------------------------------------------------------------
 # 4. BARRE LATÉRALE - NAVIGATION ET PARAMÈTRES
 # -----------------------------------------------------------------------------
+# Affichage du logo du Ministère en haut du menu latéral
+LOGO_PATH = os.path.join(WORK_DIR, "logo.png")
+if os.path.exists(LOGO_PATH):
+    st.sidebar.image(LOGO_PATH, use_container_width=True)
+
 st.sidebar.title("⚙️ Paramètres de Navigation")
 
 menu_option = st.sidebar.radio(
@@ -106,9 +111,7 @@ else:
     is_national = False
     current_prov = "Tshopo"
 
-# -----------------------------------------------------------------------------
 # SECTION VÉRIFICATION DE TERRAIN (GPS) - SUPPORT MULTI-FORMAT (DD / DMS)
-# -----------------------------------------------------------------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("📌 Vérification de Terrain (GPS)")
 use_gps = st.sidebar.checkbox("Activer un point de contrôle GPS", value=False)
@@ -156,7 +159,6 @@ def compute_gee_stats(geo_json_str, scale=1000):
     try:
         region = ee.Geometry(json.loads(geo_json_str))
         
-        # Récupération automatique du jeu de données le plus récent
         try:
             hansen = ee.Image("UMD/hansen/global_forest_change_2023_v1_11").clip(region)
         except Exception:
@@ -350,7 +352,6 @@ elif menu_option == "🚨 Système d'Alerte Précoce (RADD/Sentinel)":
     
     region_ee = ee.Geometry(geo_json_payload)
     
-    # Chargement de la collection d'alertes RADD radar
     try:
         radd_alerts = ee.ImageCollection('projects/radar-wu/radd/alerts') \
                         .filterBounds(region_ee) \
@@ -360,7 +361,6 @@ elif menu_option == "🚨 Système d'Alerte Précoce (RADD/Sentinel)":
         
         m_radd = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles="OpenStreetMap")
         
-        # Superposition des alertes RADD (Jaune/Orange/Rouge)
         radd_layer = add_ee_layer(
             radd_alerts.selfMask(), 
             {'min': 2, 'max': 3, 'palette': ['ffb74d', 'd32f2f']}, 
