@@ -230,7 +230,7 @@ else:
 # 6. EN-TÊTE PRINCIPAL
 # -----------------------------------------------------------------------------
 st.title("🌲 Plateforme Nationale de Surveillance Forestiere, Prospective & Alerte Précoce (RDC)")
-st.caption("Outil décisionnel basé sur **Google Earth Engine**, **Random Forest** et le **Deep Learning**., **Auteur: Stephin MBOKOLO**")
+st.caption("Outil décisionnel basé sur **Google Earth Engine**, **Random Forest** et le **Deep Learning**. Auteur : Stephin MBOKOLO")
 
 if not gee_ok:
     st.error(f"❌ Erreur d'initialisation Google Earth Engine : {gee_msg}")
@@ -263,9 +263,8 @@ if menu_option == "📊 Observatoire Spatiale":
     c5.metric("⚪ Urbain / Savane / Autre", f"{stats['other']:,.0f} ha", f"{p_oth:.1f}%")
     
     st.markdown("---")
-    st.markdown("### 🗺️ Carte d'Occupation du Sol Complète et Classifiée")
+    st.markdown("### 🗺️ Carte d'Occupation du Sol Classifiée et Unifiée")
     
-    # Utilisation d'un fond de carte neutre (CartoDB positron) pour valoriser la classification thématique
     m = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles="CartoDB positron")
     
     region_ee = ee.Geometry(geo_json_payload)
@@ -274,8 +273,6 @@ if menu_option == "📊 Observatoire Spatiale":
     treecover = hansen_img.select('treecover2000')
     loss_img = hansen_img.select('loss')
     
-    # Création d'une image unique classifiée unifiée (Land Cover Raster)
-    # 1: Forêt Primaire | 2: Forêt Secondaire | 3: Déforestation | 4: Urbain / Savane / Autre
     class_image = ee.Image(4) \
         .where(treecover.lt(10).And(loss_img.eq(0)), 4) \
         .where(treecover.gte(10).And(treecover.lt(60)).And(loss_img.eq(0)), 2) \
@@ -292,6 +289,27 @@ if menu_option == "📊 Observatoire Spatiale":
     layer_classified = add_ee_layer(class_image, landcover_vis, '🗺️ Occupation du Sol Classifiée')
     layer_classified.add_to(m)
     
+    # --- AJOUT DE LA COUCHE NDVI CONTINUE POUR VISUALISER LES STRATES VÉGÉTALES ---
+    landsat_col = ee.ImageCollection('LANDSAT/LC08/C02/T1_L2') \
+        .filterBounds(region_ee) \
+        .filterDate('2023-01-01', '2025-12-31') \
+        .median()
+        
+    def compute_ndvi(img):
+        return img.normalizedDifference(['SR_B5', 'SR_B4']).rename('NDVI')
+        
+    ndvi_image = compute_ndvi(landsat_col).clip(region_ee)
+    
+    ndvi_vis = {
+        'min': 0.1,
+        'max': 0.85,
+        'palette': ['#d73027', '#fee08b', '#d9ef8b', '#91cf6d', '#1a9850', '#006837']
+    }
+    
+    layer_ndvi = add_ee_layer(ndvi_image, ndvi_vis, '🌿 Indice NDVI (Strates Végétales)')
+    layer_ndvi.add_to(m)
+    # -----------------------------------------------------------------------------
+
     if gdf_provinces is not None:
         folium.GeoJson(
             selected_gdf,
