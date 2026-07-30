@@ -13,7 +13,7 @@ import os
 # 1. CONFIGURATION DE LA PAGE
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Plateforme Nationale de Surveillance Forestière & Co-bénéfices One Health (RDC)",
+    page_title="Plateforme Nationale de Surveillance Forestiere & Alerte Précoce (RDC)",
     page_icon="🌲",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -50,7 +50,7 @@ def add_ee_layer(ee_image_object, vis_params, name):
     map_id_dict = ee.Image(ee_image_object).getMapId(vis_params)
     return folium.TileLayer(
         tiles=map_id_dict['tile_fetcher'].url_format,
-        attr='Google Earth Engine / Hansen & RADD',
+        attr='Google Earth Engine',
         name=name,
         overlay=True,
         control=True
@@ -88,9 +88,9 @@ st.sidebar.title("⚙️ Paramètres de Navigation")
 menu_option = st.sidebar.radio(
     "Navigation Fonctionnelle :",
     [
-        "📊 Observatoire Spatial",
+        "📊 Observatoire Spatiale",
         "🚨 Système d'Alerte Précoce (RADD/Sentinel)",
-        "🔮 Modélisation Prospective & Co-bénéfices One Health (2025-2035)",
+        "🔮 Modélisation Prospective & IA (2025-2035)",
         "📥 Rapports & Exportations"
     ]
 )
@@ -113,7 +113,6 @@ else:
     is_national = False
     current_prov = "Tshopo"
 
-# SECTION VÉRIFICATION DE TERRAIN (GPS) - SUPPORT MULTI-FORMAT (DD / DMS)
 st.sidebar.markdown("---")
 st.sidebar.subheader("📌 Vérification de Terrain (GPS)")
 use_gps = st.sidebar.checkbox("Activer un point de contrôle GPS", value=False)
@@ -207,7 +206,6 @@ def compute_gee_stats(geo_json_str, scale=1000):
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-# Géométrie
 if gdf_provinces is not None:
     if is_national:
         selected_gdf = gdf_provinces
@@ -231,8 +229,8 @@ else:
 # -----------------------------------------------------------------------------
 # 6. EN-TÊTE PRINCIPAL
 # -----------------------------------------------------------------------------
-st.title("🌲 Modélisation Prospective des Co-bénéfices One Health (2025-2035) & Intégrité Écosystémique en RDC")
-st.caption("Outil d'aide à la décision basé sur **Google Earth Engine**, **Random Forest**, et l'approche intégrée **One Health** | **Auteur : Stephin MBOKOLO MBAKA** (Master 2, Modélisation Appliquée en Santé Globale et Changement Climatique)")
+st.title("🌲 Plateforme Nationale de Surveillance Forestiere, Prospective & Alerte Précoce (RDC)")
+st.caption("Outil décisionnel basé sur **Google Earth Engine**, **Random Forest** et le **Deep Learning**., **Auteur: Stephin MBOKOLO**")
 
 if not gee_ok:
     st.error(f"❌ Erreur d'initialisation Google Earth Engine : {gee_msg}")
@@ -248,16 +246,9 @@ if not stats["success"]:
 # -----------------------------------------------------------------------------
 # 7. MODULE 1 : OBSERVATOIRE SPATIAL
 # -----------------------------------------------------------------------------
-if menu_option == "📊 Observatoire Spatial":
-    st.subheader(f"📊 Indicateurs Globaux de l'Occupation du Sol & Intégrité Écosystémique — {current_prov}")
+if menu_option == "📊 Observatoire Spatiale":
+    st.subheader(f"📊 Indicateurs Globaux de l'Occupation du Sol — {current_prov}")
     
-    # Intégration de l'évaluation méthodologique exigée par le jury
-    st.info("""
-    💡 **Note Méthodologique (Jury) :** Les superficies ci-dessous proviennent du traitement multi-sources de la base de données 
-    **Hansen Global Forest Change (v1.11)** couplée aux limites administratives officielles de la RDC (GADM). 
-    L'intégrité écosystémique de la Cuvette Centrale et des provinces est mesurée par le ratio de maintien des forêts primaires denses.
-    """)
-
     tot = stats["total"] if stats["total"] > 0 else 1.0
     p_pri = (stats["primary"] / tot) * 100
     p_sec = (stats["secondary"] / tot) * 100
@@ -272,9 +263,10 @@ if menu_option == "📊 Observatoire Spatial":
     c5.metric("⚪ Urbain / Savane / Autre", f"{stats['other']:,.0f} ha", f"{p_oth:.1f}%")
     
     st.markdown("---")
-    st.markdown("### 🗺️ Carte Interactive & Superposition Satellite")
+    st.markdown("### 🗺️ Carte d'Occupation du Sol Complète et Classifiée")
     
-    m = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles="OpenStreetMap")
+    # Utilisation d'un fond de carte neutre (CartoDB positron) pour valoriser la classification thématique
+    m = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles="CartoDB positron")
     
     region_ee = ee.Geometry(geo_json_payload)
     hansen_img = ee.Image("UMD/hansen/global_forest_change_2023_v1_11").clip(region_ee)
@@ -282,14 +274,23 @@ if menu_option == "📊 Observatoire Spatial":
     treecover = hansen_img.select('treecover2000')
     loss_img = hansen_img.select('loss')
     
-    primary_mask = treecover.gte(60).And(loss_img.eq(0)).selfMask()
-    deforest_mask = loss_img.gt(0).selfMask()
+    # Création d'une image unique classifiée unifiée (Land Cover Raster)
+    # 1: Forêt Primaire | 2: Forêt Secondaire | 3: Déforestation | 4: Urbain / Savane / Autre
+    class_image = ee.Image(4) \
+        .where(treecover.lt(10).And(loss_img.eq(0)), 4) \
+        .where(treecover.gte(10).And(treecover.lt(60)).And(loss_img.eq(0)), 2) \
+        .where(treecover.gte(60).And(loss_img.eq(0)), 1) \
+        .where(loss_img.gt(0), 3) \
+        .clip(region_ee)
+
+    landcover_vis = {
+        'min': 1,
+        'max': 4,
+        'palette': ['2e7d32', '81c784', 'd32f2f', 'e0e0e0']
+    }
     
-    layer_primary = add_ee_layer(primary_mask, {'palette': ['2e7d32']}, '🟢 Forêt Dense Primaire')
-    layer_deforest = add_ee_layer(deforest_mask, {'palette': ['d32f2f']}, '🔴 Déforestation Historique')
-    
-    layer_primary.add_to(m)
-    layer_deforest.add_to(m)
+    layer_classified = add_ee_layer(class_image, landcover_vis, '🗺️ Occupation du Sol Classifiée')
+    layer_classified.add_to(m)
     
     if gdf_provinces is not None:
         folium.GeoJson(
@@ -297,8 +298,9 @@ if menu_option == "📊 Observatoire Spatial":
             name="Limites Administratives",
             style_function=lambda x: {
                 'fillColor': 'transparent',
-                'color': '#1b5e20',
-                'weight': 2.5
+                'color': '#000000',
+                'weight': 1.5,
+                'dashArray': '3, 3'
             }
         ).add_to(m)
     
@@ -351,11 +353,10 @@ if menu_option == "📊 Observatoire Spatial":
 # 8. MODULE 2 : SYSTÈME D'ALERTE PRÉCOCE (RADD / SENTINEL-1)
 # -----------------------------------------------------------------------------
 elif menu_option == "🚨 Système d'Alerte Précoce (RADD/Sentinel)":
-    st.subheader(f"🚨 Détection Quasi-Temps Réel des Perturbations Forestières & Interface Santé — {current_prov}")
+    st.subheader(f"🚨 Détection Quasi-Temps Réel des Perturbations Forestières — {current_prov}")
     st.markdown("""
-    Ce module exploite le système d'alerte **RADD (Radar Alerts for Deforestation)** basé sur les satellites **Sentinel-1** (imagerie radar). 
-    En cohérence avec l'approche **One Health**, la surveillance rapprochée des fronts de déforestation permet d'anticiper la fragmentation des habitats naturels, 
-    facteur clé de risque d'émergence de zoonoses et de pressions sur les services écosystémiques.
+    Ce module exploite le système d'alerte **RADD (Radar Alerts for Deforestation)** basé sur les satellites **Sentinel-1**. 
+    Il permet d'identifier les perturbations du couvert forestier à haute fréquence spatio-temporelle, indépendamment de la couverture nuageuse.
     """)
     
     region_ee = ee.Geometry(geo_json_payload)
@@ -367,7 +368,7 @@ elif menu_option == "🚨 Système d'Alerte Précoce (RADD/Sentinel)":
                         .mosaic() \
                         .clip(region_ee)
         
-        m_radd = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles="OpenStreetMap")
+        m_radd = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles="CartoDB positron")
         
         radd_layer = add_ee_layer(
             radd_alerts.selfMask(), 
@@ -391,28 +392,22 @@ elif menu_option == "🚨 Système d'Alerte Précoce (RADD/Sentinel)":
 
     rate_def = (stats["deforestation"] / (stats["total"] if stats["total"] > 0 else 1)) * 100
     st.markdown("---")
-    st.markdown("#### Directives de Surveillance Terrain & Recommandations One Health")
+    st.markdown("#### Directives de Surveillance Terrain")
     if rate_def > 10:
-        st.error("⚠️ **Niveau d'Alerte : ÉLEVÉ.** Risque accru de fragmentation écosystémique. Activation recommandée des équipes de patrouille et renforcement de la veille sanitaire locale.")
+        st.error("⚠️ **Niveau d'Alerte : ÉLEVÉ.** Activation recommandée des équipes de patrouille sur les fronts de déforestation identifiés.")
     else:
-        st.success("✅ **Niveau d'Alerte : MODÉRÉ / FAIBLE.** Dynamique écosystémique sous contrôle relatif.")
+        st.success("✅ **Niveau d'Alerte : MODÉRÉ / FAIBLE.** Dynamique sous contrôle relatif.")
 
 # -----------------------------------------------------------------------------
-# 9. MODULE 3 : MODÉLISATION PROSPECTIVE & CO-BÉNÉFICES ONE HEALTH (2025-2035)
+# 9. MODULE 3 : MODÉLISATION PROSPECTIVE & IA (RANDOM FOREST & DEEP LEARNING)
 # -----------------------------------------------------------------------------
-elif menu_option == "🔮 Modélisation Prospective & Co-bénéfices One Health (2025-2035)":
-    st.subheader(f"🔮 Projections Prospective & Modélisation des Co-bénéfices (2025-2035) — {current_prov}")
-    st.markdown("""
-    *Conformément au cadre de recherche du projet de Master 2 sur la modélisation prospective des co-bénéfices One Health (2025-2035) :* 
-    Ce module évalue l'impact de la trajectoire d'intégrité écosystémique de la Cuvette Centrale et des provinces de la RDC sur la séquestration carbone, 
-    la régulation climatique régionale et la stabilité des écosystèmes forestiers face aux pressions anthropiques.
-    """)
+elif menu_option == "🔮 Modélisation Prospective & IA (2025-2035)":
+    st.subheader(f"🔮 Projections & Modèles d'Intelligence Artificielle — {current_prov}")
     
-    tab_proj, tab_rf, tab_dl, tab_onehealth = st.tabs([
-        "📈 Projections Temporelles (2025-2035)", 
+    tab_proj, tab_rf, tab_dl = st.tabs([
+        "📈 Projections Temporal (2025-2035)", 
         "🌲 Modèle Random Forest (Facteurs clés)", 
-        "🧠 Modèle Deep Learning (Prédictions Spatiales)",
-        "🌐 Indicateurs de Co-bénéfices One Health"
+        "🧠 Modèle Deep Learning (Prédictions Spatiales)"
     ])
     
     with tab_proj:
@@ -430,19 +425,19 @@ elif menu_option == "🔮 Modélisation Prospective & Co-bénéfices One Health 
         
         fig_proj = go.Figure()
         fig_proj.add_trace(go.Scatter(x=df_proj["Année"], y=df_proj["Tendance Actuelle (Fil de l'eau)"], name="Tendances Actuelles", line=dict(color="#d32f2f", width=3)))
-        fig_proj.add_trace(go.Scatter(x=df_proj["Année"], y=df_proj["Scénario Conservation (REDD+)"], name="Objectif REDD+ / One Health (-50%)", line=dict(color="#2e7d32", width=3, dash="dash")))
+        fig_proj.add_trace(go.Scatter(x=df_proj["Année"], y=df_proj["Scénario Conservation (REDD+)"], name="Objectif REDD+ (-50%)", line=dict(color="#2e7d32", width=3, dash="dash")))
         
         fig_proj.update_layout(
-            title="Évolution Projetée de la Forêt Primaire et de l'Intégrité Écosystémique (Hectares)",
+            title="Évolution Projetée de la Forêt Primaire (Hectares)",
             xaxis_title="Année",
-            yaxis_title="Superficie Forêt Primaire (ha)",
-            legend_title="Scénarios prospectifs"
+            yaxis_title="Superficie (ha)",
+            legend_title="Scénarios"
         )
         st.plotly_chart(fig_proj, use_container_width=True)
         
     with tab_rf:
         st.markdown("### 🌲 Random Forest : Importance des Facteurs Explicatifs (Feature Importance)")
-        st.write("Le modèle **Random Forest** quantifie l'influence relative des moteurs de déforestation en RDC (infrastructure, démographie, accessibilité).")
+        st.write("Le modèle **Random Forest** analyse l'influence relative des facteurs anthropiques et environnementaux sur la probabilité de déforestation.")
         
         df_rf = pd.DataFrame({
             "Variable": ["Proximité des routes", "Distance aux cours d'eau", "Proximité des villes/agglomérations", "Pente du terrain", "Densité de population"],
@@ -455,29 +450,17 @@ elif menu_option == "🔮 Modélisation Prospective & Co-bénéfices One Health 
         
     with tab_dl:
         st.markdown("### 🧠 Deep Learning : Modélisation Spatio-Temporelle Prospective")
-        st.write("Le réseau de neurones convolutif (CNN/LSTM) intègre l'analyse non linéaire des dynamiques d'occupation du sol pour cartographier les risques à l'horizon 2035.")
+        st.write("Le réseau de neurones convolutif (CNN/LSTM) prédit la configuration spatiale des futurs fronts de déforestation à l'horizon 2035 en intégrant la dynamique spatiale non linéaire.")
         
         c_dl1, c_dl2 = st.columns(2)
         c_dl1.metric("Précision Globale (Validation Cross-Val)", "91.4 %")
         c_dl2.metric("Indice Kappa de Cohen", "0.86")
 
-    with tab_onehealth:
-        st.markdown("### 🌐 Synthèse des Co-bénéfices Intégrés (Climat - Biodiversité - Santé)")
-        st.markdown("""
-        L'analyse croisée des données montre qu'une politique de conservation rigoureuse (Scénario REDD+) permet de préserver non seulement les stocks majeurs de carbone de la cuvette, 
-        mais garantit également la résilience des équilibres climatiques locaux et la limitation des interfaces de zoonoses.
-        """)
-        
-        col_oh1, col_oh2, col_oh3 = st.columns(3)
-        col_oh1.metric("Séquestration Carbone Estimée", f"{(stats['primary'] * 150):,.0f} tCO2eq", "Potentiel Cuvette")
-        col_oh2.metric("Indice de Connectivité Écosystémique", "Élevé (84%)", "Stabilité Régionale")
-        col_oh3.metric("Indicateur de Risque Zoonotique", "Maîtrisé sous Scénario Vert", "Approche One Health")
-
 # -----------------------------------------------------------------------------
 # 10. MODULE 4 : RAPPORTS & EXPORTATIONS
 # -----------------------------------------------------------------------------
 elif menu_option == "📥 Rapports & Exportations":
-    st.subheader("📥 Exportation des Données, Rapports et Synthèses Exécutives")
+    st.subheader("📥 Exportation des Données et Synthèses Exécutives")
     
     df_report = pd.DataFrame([{
         "Province": current_prov,
@@ -490,19 +473,17 @@ elif menu_option == "📥 Rapports & Exportations":
     
     csv_data = df_report.to_csv(index=False).encode('utf-8')
     
-    report_txt = f"""=== SYNTHÈSE EXÉCUTIVE : MODÉLISATION DES CO-BÉNÉFICES ONE HEALTH (2025-2035) ===
-Zone d'étude : {current_prov}
-Auteur : Stephin MBOKOLO MBAKA (Master 2, Santé Globale & Changement Climatique)
---------------------------------------------------------------------------------
-- Forêt Primaire (Intégrité écosystémique) : {stats['primary']:,.2f} ha
-- Forêt Secondaire : {stats['secondary']:,.2f} ha
-- Déforestation Cumulée : {stats['deforestation']:,.2f} ha
-- Urbain / Savane / Autre : {stats['other']:,.2f} ha
-- Superficie Totale Analysée : {stats['total']:,.2f} ha
-================================================================================
-Généré via la Plateforme Nationale de Surveillance Forestière & Alerte Précoce (RDC)
+    report_txt = f"""=== SYNTHÈSE EXÉCUTIVE DE SURVEILLANCE FORESTIÈRE ===
+Zone : {current_prov}
+Forêt Primaire : {stats['primary']:,.2f} ha
+Forêt Secondaire : {stats['secondary']:,.2f} ha
+Déforestation Cumulée : {stats['deforestation']:,.2f} ha
+Urbain / Savane / Autre : {stats['other']:,.2f} ha
+Superficie Totale : {stats['total']:,.2f} ha
+======================================================
+Generated via Streamlit National Forest Platform
 """
     
     col_d1, col_d2 = st.columns(2)
     col_d1.download_button("📊 Télécharger les statistiques (.CSV)", data=csv_data, file_name=f"stats_foret_{current_prov}.csv", mime="text/csv")
-    col_d2.download_button("📄 Télécharger le Rapport Exécutif (.TXT)", data=report_txt, file_name=f"rapport_one_health_{current_prov}.txt", mime="text/plain")
+    col_d2.download_button("📄 Télécharger le Rapport Exécutif (.TXT)", data=report_txt, file_name=f"rapport_{current_prov}.txt", mime="text/plain")
