@@ -209,7 +209,7 @@ if not stats["success"]:
     st.stop()
 
 # -----------------------------------------------------------------------------
-# 7. MODULE 1 : OBSERVATOIRE SPATIAL (Version Conforme Jury)
+# 7. MODULE 1 : OBSERVATOIRE SPATIAL (Avec Google Satellite & ESA WorldCover)
 # -----------------------------------------------------------------------------
 if menu_option == "📊 Observatoire Spatiale":
     st.subheader(f"📊 Indicateurs Globaux de l'Occupation du Sol — {current_prov}")
@@ -225,32 +225,59 @@ if menu_option == "📊 Observatoire Spatiale":
     c5.metric("Autres", f"{stats['other']:,.0f} ha", f"{p_oth:.1f}%")
     
     st.markdown("---")
-    st.markdown("### 🗺️ Carte d'Occupation du Sol (ESA WorldCover 10m - Référence Mondiale)")
+    st.markdown("### 🗺️ Visualisation Spatiale (Fusion Vue Satellite Google Earth & ESA WorldCover)")
     
-    m = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles="CartoDB positron")
-    region_ee = ee.Geometry(geo_json_payload)
+    m = folium.Map(location=map_center, zoom_start=zoom_lvl)
 
-    # Chargement ESA WorldCover 10m
+    # 1. Ajout de la couche "Google Satellite" (Style Google Earth Pro)
+    folium.TileLayer(
+        tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+        attr='Google Satellite',
+        name='🌍 Vue Satellite (Google Earth)',
+        overlay=True,
+        control=True
+    ).add_to(m)
+
+    # 2. Ajout de la couche de classification ESA WorldCover par-dessus
+    region_ee = ee.Geometry(geo_json_payload)
     esa = ee.ImageCollection("ESA/WorldCover/v200").first().clip(region_ee)
-    layer_esa = add_ee_layer(esa, {'bands': ['Map']}, '🌍 Occupation du Sol (ESA)')
+    layer_esa = add_ee_layer(esa, {'bands': ['Map']}, '🔍 Classification ESA WorldCover')
     layer_esa.add_to(m)
 
+    # 3. Ajout des limites administratives
     if gdf_provinces is not None:
-        folium.GeoJson(selected_gdf, name="Limites", style_function=lambda x: {'fillColor': 'transparent', 'color': '#000000', 'weight': 1.5}).add_to(m)
+        folium.GeoJson(
+            selected_gdf, 
+            name="Limites Administratives", 
+            style_function=lambda x: {'fillColor': 'transparent', 'color': 'yellow', 'weight': 2}
+        ).add_to(m)
     
+    # 4. Ajout éventuel du point GPS de contrôle terrain
     if use_gps and gps_lat is not None and gps_lon is not None:
-        folium.Marker([gps_lat, gps_lon], popup=f"<b>Point :</b> {gps_label}", icon=folium.Icon(color="red")).add_to(m)
+        folium.Marker(
+            [gps_lat, gps_lon], 
+            popup=f"<b>Point de contrôle :</b> {gps_label}", 
+            icon=folium.Icon(color="red", icon="crosshairs", prefix="fa")
+        ).add_to(m)
     
     folium.LayerControl(collapsed=False).add_to(m)
-    st_folium(m, width="100%", height=500)
+    st_folium(m, width="100%", height=550)
     
-    st.info("**Guide de lecture (ESA WorldCover 10m) :** 🟢 Forêt | 🟤 Savane | 🔵 Eau | 🔴 Déforestation/Bâti")
+    st.info("""
+    💡 **Conseil pour le jury :** Utilisez le panneau de contrôle en haut à droite de la carte pour alterner ou superposer 
+    la **'Vue Satellite (Google Earth)'** et la **'Classification ESA'** afin de valider visuellement l'état du couvert forestier sur le terrain.
+    """)
     
     st.markdown("---")
     st.markdown("### 🍩 Synthèse Proportionnelle")
-    df_pie = pd.DataFrame({"Classe": ["Forêt Primaire", "Forêt Secondaire", "Déforestation", "Urbain/Savane"], "Superficie": [stats["primary"], stats["secondary"], stats["deforestation"], stats["other"]]})
-    fig_pie = px.pie(df_pie, names="Classe", values="Superficie", hole=0.4, 
-                     color_discrete_map={"Forêt Primaire":"#006400", "Forêt Secondaire":"#90EE90", "Déforestation":"#FF0000", "Urbain/Savane":"#D3D3D3"})
+    df_pie = pd.DataFrame({
+        "Classe": ["Forêt Primaire", "Forêt Secondaire", "Déforestation", "Urbain/Savane"], 
+        "Superficie": [stats["primary"], stats["secondary"], stats["deforestation"], stats["other"]]
+    })
+    fig_pie = px.pie(
+        df_pie, names="Classe", values="Superficie", hole=0.4, 
+        color_discrete_map={"Forêt Primaire":"#006400", "Forêt Secondaire":"#90EE90", "Déforestation":"#FF0000", "Urbain/Savane":"#D3D3D3"}
+    )
     st.plotly_chart(fig_pie, use_container_width=True)
 
 # -----------------------------------------------------------------------------
