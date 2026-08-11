@@ -197,7 +197,7 @@ else:
 # 6. EN-TÊTE PRINCIPAL
 # -----------------------------------------------------------------------------
 st.title("🌲 Plateforme Nationale de Surveillance Forestiere, Prospective & Alerte Précoce (RDC)")
-st.caption("Outil décisionnel basé sur **Google Earth Engine**, **Random Forest** et le **Deep Learning**. Auteur : Stephin MBOKOLO")
+st.caption("Outil décisionnel, **Random Forest** et le **Deep Learning**. Auteur : Stephin MBOKOLO")
 
 if not gee_ok:
     st.error(f"❌ Erreur d'initialisation Google Earth Engine : {gee_msg}")
@@ -225,7 +225,7 @@ if menu_option == "📊 Observatoire Spatiale":
     c5.metric("Autres", f"{stats['other']:,.0f} ha", f"{p_oth:.1f}%")
     
     st.markdown("---")
-    st.markdown("### 🗺️ Visualisation Spatiale (Fusion Vue Satellite Google Earth & ESA WorldCover)")
+    st.markdown("### 🗺️ Visualisation Spatiale")
     
     m = folium.Map(location=map_center, zoom_start=zoom_lvl)
 
@@ -264,8 +264,8 @@ if menu_option == "📊 Observatoire Spatiale":
     st_folium(m, width="100%", height=550)
     
     st.info("""
-    💡 **Conseil pour le jury :** Utilisez le panneau de contrôle en haut à droite de la carte pour alterner ou superposer 
-    la **'Vue Satellite (Google Earth)'** et la **'Classification ESA'** afin de valider visuellement l'état du couvert forestier sur le terrain.
+    💡 **Cons :** Utilisez le panneau de contrôle en haut à droite de la carte pour alterner ou superposer 
+    la **'Vue Satellite'** et la **'Classification'** afin de valider visuellement l'état du couvert forestier sur le terrain.
     """)
     
     st.markdown("---")
