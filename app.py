@@ -241,7 +241,7 @@ if menu_option == "📊 Observatoire Spatiale":
     # 2. Ajout de la couche de classification ESA WorldCover par-dessus
     region_ee = ee.Geometry(geo_json_payload)
     esa = ee.ImageCollection("ESA/WorldCover/v200").first().clip(region_ee)
-    layer_esa = add_ee_layer(esa, {'bands': ['Map']}, '🔍 Classification ESA WorldCover')
+    layer_esa = add_ee_layer(esa, {'bands': ['Map']}, '🔍 Classification')
     layer_esa.add_to(m)
 
     # 3. Ajout des limites administratives
