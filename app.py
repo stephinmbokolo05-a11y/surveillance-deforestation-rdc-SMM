@@ -233,7 +233,7 @@ if menu_option == "📊 Observatoire Spatiale":
     folium.TileLayer(
         tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
         attr='Google Satellite',
-        name='🌍 Vue Satellite (Google Earth)',
+        name='🌍 Vue Satellite',
         overlay=True,
         control=True
     ).add_to(m)
