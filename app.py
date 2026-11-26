@@ -355,11 +355,20 @@ elif menu_option == "🚨 Système d'Alerte Précoce (RADD/Sentinel)":
                         .clip(region_ee)
         
         m_radd = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles="CartoDB positron")
+
+        folium.TileLayer(
+            tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+            attr='Google Satellite',
+            name='🌍 Vue Satellite',
+            overlay=True,
+            control=True
+        ).add_to(m_radd)
         
         radd_layer = add_ee_layer(
             radd_alerts.selfMask(), 
             {'min': 2, 'max': 3, 'palette': ['ffb74d', 'd32f2f']}, 
-            '🚨 Alertes Déforestation RADD (Sentinel-1)'
+            '🚨 Alertes Déforestation RADD (Sentinel-1)',
+            opacity=0.85
         )
         if radd_layer is not None:
             radd_layer.add_to(m_radd)
@@ -373,6 +382,23 @@ elif menu_option == "🚨 Système d'Alerte Précoce (RADD/Sentinel)":
             
         folium.LayerControl(collapsed=False).add_to(m_radd)
         st_folium(m_radd, width="100%", height=500)
+
+        st.markdown("#### 🚨 Légende des Alertes RADD (Sentinel-1)")
+        radd_leg_cols = st.columns(3)
+        radd_legend = [
+            ("#ffb74d", "Perturbation / Alerte modérée"),
+            ("#d32f2f", "Déforestation confirmée / haute priorité"),
+            ("#000000", "Limites administratives de la zone")
+        ]
+        for idx, (col_hex, desc_txt) in enumerate(radd_legend):
+            with radd_leg_cols[idx]:
+                st.markdown(
+                    f'<div style="display:flex;align-items:center;margin-bottom:6px;">'
+                    f'<span style="display:inline-block;width:16px;height:16px;background-color:{col_hex};'
+                    f'border:1px solid #333;border-radius:3px;margin-right:8px;"></span>'
+                    f'<span style="font-size:0.85rem;">{desc_txt}</span></div>',
+                    unsafe_allow_html=True
+                )
         
     except Exception as e:
         st.warning(f"Chargement des alertes RADD en cours ou indisponible pour cette zone : {e}")
