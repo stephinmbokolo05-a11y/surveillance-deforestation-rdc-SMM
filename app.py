@@ -52,7 +52,7 @@ def init_gee():
 
 gee_ok, gee_msg = init_gee()
 
-def add_ee_layer(ee_image_object, vis_params, name):
+def add_ee_layer(ee_image_object, vis_params, name, opacity=0.8):
     try:
         map_id_dict = ee.Image(ee_image_object).getMapId(vis_params)
         return folium.TileLayer(
@@ -60,7 +60,8 @@ def add_ee_layer(ee_image_object, vis_params, name):
             attr='Google Earth Engine',
             name=name,
             overlay=True,
-            control=True
+            control=True,
+            opacity=opacity
         )
     except Exception as e:
         st.warning(f"Couche '{name}' non affichée : {e}")
@@ -251,7 +252,25 @@ if menu_option == "📊 Observatoire Spatiale":
     # 2. Ajout de la couche de classification ESA WorldCover par-dessus
     region_ee = ee.Geometry(geo_json_payload)
     esa = ee.ImageCollection("ESA/WorldCover/v200").first().clip(region_ee)
-    layer_esa = add_ee_layer(esa, {'bands': ['Map'], 'min': 10, 'max': 100}, '🔍 Classification')
+    esa_vis = {
+        'bands': ['Map'],
+        'min': 10,
+        'max': 100,
+        'palette': [
+            '006400',  # 10 - Tree cover
+            'ffbb22',  # 20 - Shrubland
+            'ffff4c',  # 30 - Grassland
+            'f096ff',  # 40 - Cropland
+            'fa0000',  # 50 - Built-up
+            'b4b4b4',  # 60 - Bare / sparse vegetation
+            'f0f0f0',  # 70 - Snow and ice
+            '0064c8',  # 80 - Permanent water bodies
+            '0096a0',  # 90 - Herbaceous wetland
+            '00cf75',  # 95 - Mangroves
+            'fae6a0'   # 100 - Moss and lichen
+        ]
+    }
+    layer_esa = add_ee_layer(esa, esa_vis, '🔍 Classification', opacity=0.8)
     if layer_esa is not None:
         layer_esa.add_to(m)
 
