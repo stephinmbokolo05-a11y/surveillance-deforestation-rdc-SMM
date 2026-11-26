@@ -22,24 +22,30 @@ st.set_page_config(
 # -----------------------------------------------------------------------------
 # 2. INITIALISATION GOOGLE EARTH ENGINE (GEE)
 # -----------------------------------------------------------------------------
-@st.cache_resource
+@st.cache_resource(show_spinner="Connexion à Google Earth Engine...")
 def init_gee():
     try:
-        if "GEE_JSON" in st.secrets:
+        if "GEE_JSON" in st.secrets and st.secrets["GEE_JSON"]:
             secrets_data = st.secrets["GEE_JSON"]
             if isinstance(secrets_data, str):
-                json_creds = json.loads(secrets_data)
+                json_creds = json.loads(secrets_data.strip())
             else:
                 json_creds = dict(secrets_data)
-                
+
+            client_email = json_creds.get("client_email")
+            project_id = json_creds.get("project_id", "ee-stephinmbokolo05")
+
+            if not client_email or not json_creds.get("private_key"):
+                return False, "Clé GEE_JSON incomplète (client_email ou private_key manquant)."
+
             credentials = ee.ServiceAccountCredentials(
-                json_creds["client_email"],
+                client_email,
                 key_data=json.dumps(json_creds)
             )
-            ee.Initialize(credentials)
-            return True, "Initialisation réussie via st.secrets."
+            ee.Initialize(credentials, project=project_id)
+            return True, f"Initialisation réussie via compte de service ({project_id})."
         else:
-            ee.Initialize()
+            ee.Initialize(project="ee-stephinmbokolo05")
             return True, "Initialisation réussie via authentification locale."
     except Exception as e:
         return False, str(e)
