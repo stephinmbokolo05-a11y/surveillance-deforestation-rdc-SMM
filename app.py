@@ -292,6 +292,31 @@ if menu_option == "📊 Observatoire Spatiale":
     
     folium.LayerControl(collapsed=False).add_to(m)
     st_folium(m, width="100%", height=550)
+
+    # Légende détaillée des classes ESA WorldCover (10m)
+    st.markdown("#### 🎨 Légende de la Classification (ESA WorldCover v200 — 10 m)")
+    legend_items = [
+        ("#006400", "Couvert arboré / Forêt (10)"),
+        ("#ffbb22", "Broussailles / Arbustes (20)"),
+        ("#ffff4c", "Savane / Pelouse (30)"),
+        ("#f096ff", "Terres cultivées (40)"),
+        ("#fa0000", "Zones bâties / Urbain (50)"),
+        ("#b4b4b4", "Sol nu / Végétation éparse (60)"),
+        ("#0064c8", "Plans d'eau permanents (80)"),
+        ("#0096a0", "Zones humides herbacées (90)"),
+        ("#00cf75", "Mangroves (95)"),
+        ("#fae6a0", "Mousses et lichens (100)")
+    ]
+    leg_cols = st.columns(5)
+    for idx, (color_hex, label_txt) in enumerate(legend_items):
+        with leg_cols[idx % 5]:
+            st.markdown(
+                f'<div style="display:flex;align-items:center;margin-bottom:6px;">'
+                f'<span style="display:inline-block;width:16px;height:16px;background-color:{color_hex};'
+                f'border:1px solid #333;border-radius:3px;margin-right:8px;"></span>'
+                f'<span style="font-size:0.85rem;">{label_txt}</span></div>',
+                unsafe_allow_html=True
+            )
     
     st.info("""
     💡 **Cons :** Utilisez le panneau de contrôle en haut à droite de la carte pour alterner ou superposer 
