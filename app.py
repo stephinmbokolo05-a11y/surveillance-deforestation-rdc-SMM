@@ -53,14 +53,18 @@ def init_gee():
 gee_ok, gee_msg = init_gee()
 
 def add_ee_layer(ee_image_object, vis_params, name):
-    map_id_dict = ee.Image(ee_image_object).getMapId(vis_params)
-    return folium.TileLayer(
-        tiles=map_id_dict['tile_fetcher'].url_format,
-        attr='Google Earth Engine',
-        name=name,
-        overlay=True,
-        control=True
-    )
+    try:
+        map_id_dict = ee.Image(ee_image_object).getMapId(vis_params)
+        return folium.TileLayer(
+            tiles=map_id_dict['tile_fetcher'].url_format,
+            attr='Google Earth Engine',
+            name=name,
+            overlay=True,
+            control=True
+        )
+    except Exception as e:
+        st.warning(f"Couche '{name}' non affichée : {e}")
+        return None
 
 # -----------------------------------------------------------------------------
 # 3. CHARGEMENT DU SHAPEFILE LOCAL (RDC / PROVINCES)
@@ -247,8 +251,9 @@ if menu_option == "📊 Observatoire Spatiale":
     # 2. Ajout de la couche de classification ESA WorldCover par-dessus
     region_ee = ee.Geometry(geo_json_payload)
     esa = ee.ImageCollection("ESA/WorldCover/v200").first().clip(region_ee)
-    layer_esa = add_ee_layer(esa, {'bands': ['Map']}, '🔍 Classification')
-    layer_esa.add_to(m)
+    layer_esa = add_ee_layer(esa, {'bands': ['Map'], 'min': 10, 'max': 100}, '🔍 Classification')
+    if layer_esa is not None:
+        layer_esa.add_to(m)
 
     # 3. Ajout des limites administratives
     if gdf_provinces is not None:
@@ -312,7 +317,8 @@ elif menu_option == "🚨 Système d'Alerte Précoce (RADD/Sentinel)":
             {'min': 2, 'max': 3, 'palette': ['ffb74d', 'd32f2f']}, 
             '🚨 Alertes Déforestation RADD (Sentinel-1)'
         )
-        radd_layer.add_to(m_radd)
+        if radd_layer is not None:
+            radd_layer.add_to(m_radd)
         
         if gdf_provinces is not None:
             folium.GeoJson(
