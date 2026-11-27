@@ -281,7 +281,6 @@ p_pri, p_sec, p_def, p_oth = [(stats[k] / tot) * 100 for k in ["primary", "secon
 rate_def = (stats["deforestation"] / tot) * 100
 alert_level_label = "ÉLEVÉ" if rate_def > 10 else "MODÉRÉ / FAIBLE"
 
-# Facteur carbone par défaut (tCO2e/ha pour forêt tropicale humide du bassin du Congo)
 CARBON_FACTOR_TCO2E_HA = 475.0
 annual_loss_recent = stats["deforestation"] / 23.0 if stats["deforestation"] > 0 else 1000.0
 
@@ -349,6 +348,16 @@ if menu_option == "📊 Observatoire Spatiale":
             icon=folium.Icon(color="red", icon="crosshairs", prefix="fa")
         ).add_to(m)
 
+    # Couche superposée style Google Earth Pro (satellite + étiquettes récentes)
+    folium.TileLayer(
+        tiles='https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+        attr='Google Earth Pro / Hybrid',
+        name='🛰️ Google Earth Pro (Hybride)',
+        overlay=True,
+        control=True,
+        opacity=0.85
+    ).add_to(m)
+
     folium.LayerControl(collapsed=False).add_to(m)
     st_folium(m, width="100%", height=550)
 
@@ -378,7 +387,7 @@ if menu_option == "📊 Observatoire Spatiale":
 
     st.info("""
     💡 **Cons :** Utilisez le panneau de contrôle en haut à droite de la carte pour alterner ou superposer 
-    la **'Vue Satellite'** et la **'Classification'** afin de valider visuellement l'état du couvert forestier sur le terrain.
+    la **'Vue Satellite'**, **'Google Earth Pro (Hybride)'** et la **'Classification'** afin de valider visuellement l'état du couvert forestier sur le terrain.
     """)
 
     st.markdown("---")
@@ -589,7 +598,6 @@ elif menu_option == "🔮 Modélisation Prospective & IA (2025-2035)":
             dem = ee.Image("USGS/SRTMGL1_003").clip(region_ee)
             slope = ee.Terrain.slope(dem)
 
-            # Indice composite normalisé (0 à 100) : lisière/forêt active + voisinage perte récente + pente modérée
             forest_mask = tc.gte(30)
             loss_neigh = loss_recent.focal_mean(radius=1500, units="meters").unmask(0).clamp(0, 1)
             gentle_slope = slope.lt(15)
